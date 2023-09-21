@@ -20,4 +20,5 @@ st = [' ',',','.','!','?',':',';','/']
 
 if __name__ == "__main__":
     search_engine = Indexer(documents=d, stopwords=sw, spliters=st, lang="portuguese")
-    search_engine.search(query='Parasita oscar 2020', exact=True)
+    response = search_engine.search(query='Parasita oscar 2020', exact=False)
+    print(response)
