@@ -52,8 +52,18 @@ st = [" ", ",", ".", "!", "?", ":", ";", "/"]
 
 if __name__ == "__main__":
     search_engine = Indexer(documents=d, stopwords=sw, spliters=st, lang="portuguese")
-    results = search_engine.search(query="Parasita oscar 2020", exact=True)
+    results = search_engine.search(query="Parasita oscar", exact=True)
 
-    for doc, score in results:
-        print("Documento:", " ".join(doc))
-        print(f"Score de Similaridade TF-IDF: {score}\n")
+    documents = results[0]
+    query_weights = results[1]
+    document_weights = results[2]
+    scored_docs = search_engine.classify_documents(
+        documents, query_weights, document_weights
+    )
+
+    print("Respostas classificadas por TF-IDF\n")
+
+    index = 0
+    for doc, score in scored_docs:
+        print(index, f": score = {score} \n\t {doc}\n")
+        index += 1

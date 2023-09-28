@@ -117,6 +117,39 @@ class Indexer:
         """
         return [word for word in document if all(word != sw for sw in self.stopwords)]
 
+    def tf_idf_weight(self, term, document):
+        tf = document.count(term) / len(document)
+        df = 0
+        for doc in self.documents:
+            df += sum(1 for sentence in doc if term in self.normalize(sentence))
+        N = len(self.documents)
+        idf = math.log(N / df) if df > 0 else 0
+        return (1 + math.log(tf)) * idf
+
+    def classify_documents(self, documents, query_tfidf, document_tfidf):
+        """
+        Classefica documentos de acordo com sua relevância para uma consulta.
+
+        Args:
+            documents (list): Uma lista de documentos.
+            query_tfidf (dict): Um dicionário que mapeia termos de busca para seus scores de TF-IDF.
+            document_tfidf (dict): Um dicionário que mapeia termos de documentos para seus scores de TF-IDF.
+
+        Returns:
+            list: Uma lista de documentos classificados de acordo com sua relevância para a consulta.
+        """
+
+        scores = []
+        for doc in documents:
+            score = 0
+            for term in query_tfidf:
+                score += doc.count(term) * query_tfidf[term]
+            for term in document_tfidf:
+                score += doc.count(term) * document_tfidf[term]
+            scores.append((doc, score))
+
+        return sorted(scores, key=lambda doc: doc[1], reverse=True)
+
     def search(self, query: str, exact: bool = False):
         """
         Pesquisa documentos na coleção com base em uma consulta.
@@ -126,6 +159,7 @@ class Indexer:
             exact (bool, optional): Se True, a pesquisa requer uma correspondência exata
                 de todos os termos da consulta nos documentos. Se False, a pesquisa
                 considerará qualquer documento que contenha pelo menos um termo da consulta.
+            normalize_weights (bool, optional): Se True, os scores de similaridade TF-IDF serão normalizados.
 
         Returns:
             list: Uma lista de documentos que correspondem à consulta. Cada documento é representado
@@ -133,43 +167,39 @@ class Indexer:
 
         Example:
             Para pesquisar documentos que contenham pelo menos uma palavra da consulta:
-            >>> result = self.search("exemplo de pesquisa", exact=False)
+            >>> result = self.search(query="exemplo de pesquisa", exact=False)
 
             Para pesquisar documentos que correspondam exatamente à consulta:
-            >>> result = self.search("exemplo de pesquisa", exact=True)
+            >>> result = self.search(query="exemplo de pesquisa", exact=True)
         """
 
         normalized_query = self.normalize(query)
         tokenized_query = self.tokenize(normalized_query)
         stemmed_query = self.stemming(tokenized_query)
 
+        query_weights = {}
+        for term in stemmed_query:
+            query_weights[term] = self.tf_idf_weight(term, stemmed_query)
+
         documents = []
         for doc in self.documents:
-            for stantment in doc:
-                normalized_stantment = self.normalize(stantment)
-                tokenized_stantment = self.tokenize(normalized_stantment)
-                clean_stantment = self.stopwords_elimination(tokenized_stantment)
-                stemmed_document = self.stemming(clean_stantment)
-                if not (exact) and any(
-                    word in stemmed_query for word in stemmed_document
-                ):
-                    documents.append([" ".join(doc)])
-                elif exact and all(q in stemmed_document for q in stemmed_query):
-                    documents.append([" ".join(doc)])
+            document_weights = {}
+            for term in doc:
+                normalized_term = self.normalize(term)
+                tokenized_term = self.tokenize(normalized_term)
+                clean_term = self.stopwords_elimination(tokenized_term)
+                stemmed_document = self.stemming(clean_term)
+                for term in stemmed_document:
+                    if term not in document_weights:
+                        document_weights[term] = self.tf_idf_weight(
+                            term, stemmed_document
+                        )
 
-        # Calcular o TF-IDF dos documentos e da consulta
-        tfidf_vectorizer = TfidfVectorizer()
-        corpus = [" ".join(doc) for doc in self.documents]
-        tfidf_matrix = tfidf_vectorizer.fit_transform(corpus)
-        query_tfidf = tfidf_vectorizer.transform([normalized_query])
+            if not exact:
+                if any(term in document_weights for term in query_weights):
+                    documents.append(" ".join(doc))
+            elif exact:
+                if all(term in document_weights for term in query_weights):
+                    documents.append(" ".join(doc))
 
-        # Calcular os scores de similaridade TF-IDF
-        similarity_scores = (tfidf_matrix * query_tfidf.T).toarray()
-
-        # Ordenar os documentos por relevância (pontuação de similaridade TF-IDF)
-        ranked_documents = [
-            (doc, score) for doc, score in zip(self.documents, similarity_scores)
-        ]
-        ranked_documents.sort(key=lambda x: x[1], reverse=True)
-
-        return ranked_documents
+        return documents, query_weights, document_weights
