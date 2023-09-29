@@ -26,7 +26,20 @@ d = [
     ["Parasita é o vencedor da Palma de Ouro no Festival de Cannes"],
     ["Estatísticas. Brasileirão Série A: Os artilheiros e garçons da temporada 2020"],
     ["Setembro chegou! Confira o calendário da temporada 2020/2021 do futebol europeu"],
+    ["Cerimônia do Oscar 2021 é adiada devido à pandemia de COVID-19"],
+    [
+        "A ascensão do streaming: filmes da Netflix e Amazon Prime ganham destaque no Oscar"
+    ],
+    ["Atores icônicos que nunca ganharam um Oscar"],
+    ["Oscar 2020: Discurso emocionante de Joaquin Phoenix sobre meio ambiente"],
+    ["Copa do Mundo da Rússia 2018: França conquista o título"],
+    ["Novos talentos do cinema indie recebem destaque no Festival de Sundance"],
+    ["Futebol brasileiro: Flamengo conquista a Copa Libertadores 2019"],
+    ["Crescimento da audiência: Oscar ganha mais telespectadores em 2020"],
+    ["Grandes diretores de cinema que nunca ganharam um Oscar"],
+    ["Oscar 2020: Destaque para os filmes estrangeiros"],
 ]
+
 sw = [
     "a",
     "o",
@@ -55,15 +68,22 @@ if __name__ == "__main__":
     results = search_engine.search(query="Parasita oscar", exact=True)
 
     documents = results[0]
-    query_weights = results[1]
-    document_weights = results[2]
-    scored_docs = search_engine.classify_documents(
-        documents, query_weights, document_weights
+    # query_weights = results[1]
+    # document_weights = results[2]
+    # scored_docs = search_engine.classify_documents(
+    #     documents, query_weights, document_weights
+    # )
+
+    # print("Respostas classificadas por TF-IDF\n")
+
+    # index = 0
+    # for doc, score in scored_docs:
+    #     print(index, f": score = {score} \n\t {doc}\n")
+    #     index += 1
+
+    # results = search_engine.search_with_vector_model(query="Parasita oscar", exact=True)
+    ranked_documents = search_engine.rank_documents(
+        query="Parasita oscar", documents=documents
     )
 
-    print("Respostas classificadas por TF-IDF\n")
-
-    index = 0
-    for doc, score in scored_docs:
-        print(index, f": score = {score} \n\t {doc}\n")
-        index += 1
+    print(ranked_documents)

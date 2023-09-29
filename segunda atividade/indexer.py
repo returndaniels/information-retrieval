@@ -126,6 +126,66 @@ class Indexer:
         idf = math.log(N / df) if df > 0 else 0
         return (1 + math.log(tf)) * idf
 
+    def create_weight_vector(self, weights):
+        vector = []
+        for term in weights:
+            vector.append(weights[term])
+        return vector
+
+    def calculate_similarity(self, query_vector, document_vector):
+        similarity = 0
+        for i in range(len(query_vector)):
+            similarity += query_vector[i] * document_vector[i]
+        return similarity
+
+    def rank_documents(self, query: str, documents: list):
+        """
+        Gera o ranking final dos documentos para uma consulta q especificada.
+
+        Args:
+            query (str): A consulta que define os termos de pesquisa.
+            documents (list): Uma lista de documentos que correspondem à consulta.
+
+        Returns:
+            list: Uma lista de documentos, classificados de acordo com sua similaridade com a consulta q.
+
+        Example:
+            >>> documents = ["Documento 1", "Documento 2", "Documento 3"]
+            >>> query = "termo 1 termo 2"
+            >>> result = rank_documents(query, documents)
+            >>> print(result)
+            ["Documento 2", "Documento 1", "Documento 3"]
+        """
+
+        normalized_query = self.normalize(query)
+        tokenized_query = self.tokenize(normalized_query)
+        stemmed_query = self.stemming(tokenized_query)
+
+        query_weights = {}
+        for term in stemmed_query:
+            query_weights[term] = self.tf_idf_weight(term, stemmed_query)
+
+        scores = []
+        for doc in documents:
+            document_weights = {}
+            for term in doc:
+                normalized_term = self.normalize(term)
+                tokenized_term = self.tokenize(normalized_term)
+                clean_term = self.stopwords_elimination(tokenized_term)
+                stemmed_document = self.stemming(clean_term)
+                for term in stemmed_document:
+                    if term not in document_weights:
+                        document_weights[term] = self.tf_idf_weight(
+                            term, stemmed_document
+                        )
+
+            document_vector = self.create_weight_vector(document_weights)
+            query_vector = self.create_weight_vector(query_weights)
+            similarity = self.calculate_similarity(query_vector, document_vector)
+            scores.append((doc, similarity))
+
+        return sorted(scores, key=lambda doc: doc[1], reverse=True)
+
     def classify_documents(self, documents, query_tfidf, document_tfidf):
         """
         Classefica documentos de acordo com sua relevância para uma consulta.
@@ -149,6 +209,64 @@ class Indexer:
             scores.append((doc, score))
 
         return sorted(scores, key=lambda doc: doc[1], reverse=True)
+
+    def search_with_vector_model(self, query: str, exact: bool = False):
+        """
+        Pesquisa documentos na coleção com base em uma consulta, usando o modelo vetorial.
+
+        Args:
+            query (str): A consulta que define os termos de pesquisa.
+            exact (bool, optional): Se True, a pesquisa requer uma correspondência exata
+                de todos os termos da consulta nos documentos. Se False, a pesquisa
+                considerará qualquer documento que contenha pelo menos um termo da consulta.
+            normalize_weights (bool, optional): Se True, os scores de similaridade TF-IDF serão normalizados.
+
+        Returns:
+            list: Uma lista de documentos que correspondem à consulta. Cada documento é representado
+            como uma única string, onde as palavras são separadas por espaços.
+
+        Example:
+            Para pesquisar documentos que contenham pelo menos uma palavra da consulta:
+            >>> result = self.search_with_vector_model(query="exemplo de pesquisa", exact=False)
+
+            Para pesquisar documentos que correspondam exatamente à consulta:
+            >>> result = self.search_with_vector_model(query="exemplo de pesquisa", exact=True)
+        """
+
+        normalized_query = self.normalize(query)
+        tokenized_query = self.tokenize(normalized_query)
+        stemmed_query = self.stemming(tokenized_query)
+
+        query_weights = {}
+        for term in stemmed_query:
+            query_weights[term] = self.tf_idf_weight(term, stemmed_query)
+
+        documents = []
+        for doc in self.documents:
+            document_weights = {}
+            for term in doc:
+                normalized_term = self.normalize(term)
+                tokenized_term = self.tokenize(normalized_term)
+                clean_term = self.stopwords_elimination(tokenized_term)
+                stemmed_document = self.stemming(clean_term)
+                for term in stemmed_document:
+                    if term not in document_weights:
+                        document_weights[term] = self.tf_idf_weight(
+                            term, stemmed_document
+                        )
+
+            # document_vector = self.create_weight_vector(document_weights)
+            # query_vector = self.create_weight_vector(query_weights)
+            # similarity = self.calculate_similarity(query_vector, document_vector)
+
+            if not exact:
+                # if similarity > 0:
+                documents.append(" ".join(doc))
+            elif exact:
+                # if similarity == 1:
+                documents.append(" ".join(doc))
+
+        return documents
 
     def search(self, query: str, exact: bool = False):
         """
