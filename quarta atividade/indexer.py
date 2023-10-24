@@ -264,7 +264,18 @@ class Indexer:
         document_scores.sort(key=lambda x: x[1], reverse=True)
         return document_scores
 
-    def precision_recall_at_k(self, retrieved, relevant, k):
+    def precision_recall_at_k(self, retrieved: list, relevant: list, k: int) -> tuple:
+        """
+        Calcula a precisão e o recall para os documentos recuperados até o k-ésimo documento.
+
+        Args:
+            retrieved (list): A lista de documentos recuperados.
+            relevant (list): A lista de documentos relevantes.
+            k (int): O valor de k até o qual os documentos recuperados devem ser considerados.
+
+        Returns:
+            tuple: Uma tupla contendo os valores de precisão e recall calculados.
+        """
         retrieved_at_k = retrieved[:k]
         retrieved_relevant_at_k = [doc for doc in retrieved_at_k if doc in relevant]
 
@@ -279,7 +290,21 @@ class Indexer:
 
         return precision, recall
 
-    def interpolated_precision_at_recall(self, retrieved, relevant, n_levels=11):
+    def interpolated_precision_at_recall(
+        self, retrieved: list, relevant: list, n_levels: int = 11
+    ) -> list:
+        """
+        Calcula a precisão interpolada em vários níveis de recall para os documentos recuperados.
+
+        Args:
+            retrieved (list): A lista de documentos recuperados.
+            relevant (list): A lista de documentos relevantes.
+            n_levels (int, optional): O número de níveis de recall para os quais a precisão interpolada é calculada.
+
+        Returns:
+            list: Uma lista contendo os valores de precisão interpolada em diferentes níveis de recall.
+
+        """
         precision_at_recall_levels = []
         for i in range(n_levels):
             recall_level = (i + 1) / n_levels
@@ -306,7 +331,17 @@ class Indexer:
 
         return precision_at_recall_levels
 
-    def average_precision(self, retrieved, relevant):
+    def average_precision(self, retrieved: list, relevant: list) -> float:
+        """
+        Calcula a média da precisão para os documentos recuperados.
+
+        Args:
+            retrieved (list): A lista de documentos recuperados.
+            relevant (list): A lista de documentos relevantes.
+
+        Returns:
+            float: O valor da média de precisão calculada.
+        """
         average_precision_sum = 0.0
         relevant_count = 0
 
@@ -318,7 +353,19 @@ class Indexer:
 
         return average_precision_sum / len(relevant) if len(relevant) > 0 else 0
 
-    def calculate_metrics(self, query: str, R: list, exact: bool = False):
+    def calculate_metrics(self, query: str, R: list, exact: bool = False) -> tuple:
+        """
+        Calcula métricas de precisão e recall para uma consulta específica.
+
+        Args:
+            query (str): A consulta para a qual as métricas são calculadas.
+            R (list): A lista de documentos relevantes.
+            exact (bool, optional): Se True, a pesquisa requer uma correspondência exata de todos os termos da consulta nos documentos.
+                Se False, a pesquisa considerará qualquer documento que contenha pelo menos um termo da consulta.
+
+        Returns:
+            tuple: Uma tupla contendo os valores de precisão interpolada e média de precisão calculados.
+        """
         retrieved_documents = self.search(query, exact)
 
         for k in range(1, len(retrieved_documents) + 1):
