@@ -1,0 +1,176 @@
+\documentclass[12pt]{article}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{array}
+\usepackage{float}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage[portuguese]{babel}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{
+    \textit{
+        \textbf{
+            Aprimoramento da Normalização em Modelos Probabilísticos para Identificação de Tendências: Integrando Verboseness e Burstiness
+        }
+    }
+}
+
+\author{Daniel S. Silva \\
+    \textit{Instituto de Computação} \\
+    \textit{Universidade Federal do Rio de Janeiro (UFRJ)}\\
+    Rio de Janeiro, Brasil \\
+    \textit{danielss@dcc.ufrj.br}
+}
+
+\maketitle
+
+\begin{abstract}
+Este artigo propõe uma expansão significativa no estudo da normalização em modelos probabilísticos para identificação de tendências, incorporando a abordagem sistemática apresentada por Lipani et al. (2018) sobre \textit{Verboseness} e \textit{Burstiness}. A proposta visa investigar como a combinação desses conceitos pode melhorar a precisão na identificação de tópicos emergentes em textos curtos, como os encontrados em redes sociais e microblogs. Pretende-se realizar experimentos usando conjuntos de dados diversos para avaliar a eficácia do novo método de normalização proposto em comparação com os modelos tradicionais. Os resultados esperados incluem a descoberta de insights relevantes sobre a viabilidade e eficácia do novo método, com potencial para avanços significativos na área de recuperação de informações e na identificação precisa de tendências em textos curtos.
+
+\textbf{\textit{Palavras-chave---}}Identificação de tendências, Tópicos emergentes, Verboseness, Burstiness, tf-idf, Redes sociais, Microblogs
+\end{abstract}
+
+\section{Introdução}
+
+Nos últimos anos, o fenômeno das redes sociais e dos microblogs tem se tornado uma fonte abundante de informações em tempo real, gerando um terreno fértil para a análise de tendências por meio da detecção de tópicos emergentes. A identificação desses tópicos é crucial para compreender a dinâmica das discussões online e capturar a essência da sociedade contemporânea \cite{Aiello2013}. Para isso, métodos baseados em análise de frequência de termos, como a análise de frequência de documento inversa de frequência de termo (\textit{tf-idf}), têm sido aplicados para identificar esses tópicos \cite{Benhardus2013}. No âmbito da recuperação de informações (IR), cada modelo se resume a uma função de pontuação na qual se pode distinguir um componente que aumenta com o número de ocorrências de um termo em um documento (um componente de frequência de termo) e um componente que diminui com a ocorrência comum de um termo (um componente de frequência inversa de documento).
+
+\subsection{Motivações}
+A abordagem de normalização de modelos probabilísticos utilizando os conceitos de \textit{Verboseness} e \textit{Burstiness}, apresentada por Lipani et al. (2018), trouxe contribuições significativas que abrem novas possibilidades para a análise de documentos.
+
+Em breve esclareceremos o que são esses conceitos, mas antes se faz necessário que apresentemos definições para a notação utilizada no intuito de promover uma compreensão clara e consistente ao longo deste artigo.
+
+As notações apresentadas a seguir são baseadas na proposta de Lipani et al. (2018). Essas definições visam estabelecer um vocabulário comum, tornando mais acessível a interpretação dos símbolos e termos empregados. A clareza dessas definições tem como objetivo mitigar possíveis ambiguidades, proporcionando uma base sólida para a discussão, análise e compreensão dos conceitos discutidos neste trabalho, alinhando-se ao conhecimento estabelecido na área \cite{Lipani2018}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|p{5cm}|p{6cm}|}
+\hline
+Símbolo & Definição & Explicação \\
+\hline
+T & Conjunto de termos na coleção & Representa todos os termos presentes na coleção de documentos analisada. \\
+D & Conjunto de documentos na coleção & Refere-se ao conjunto de todos os documentos presentes na coleção em análise. \\
+t & Termo individual & Representa um termo específico pertencente ao conjunto T. \\
+d & Documento individual & Indica um documento específico pertencente ao conjunto D. \\
+$\vert T \vert$ & Número de termos & Refere-se à contagem total de termos na coleção T. \\
+$\vert D \vert$ & Número de documentos & Indica o total de documentos na coleção D. \\
+$l_c$ & Comprimento da coleção & Refere-se ao número total de ocorrências de termos em toda a coleção. \\
+$l_t$ & Número de ocorrências de um termo na coleção & Indica o número total de vezes que um termo específico ocorre em toda a coleção de documentos. \\
+$D_t$ & Conjunto de documentos onde o termo ocorre & Representa o conjunto de todos os documentos nos quais um termo específico é encontrado. \\
+$T_d$ & Conjunto de termos em um documento & Refere-se ao conjunto de termos presentes em um documento específico. \\
+$\vert D_t \vert$ & Número de documentos onde o termo ocorre (Frequência do Documento) & Indica quantos documentos contêm um termo específico. \\
+$\vert T_d \vert$ & Número de termos distintos em um documento & Refere-se ao total de termos únicos presentes em um documento específico. \\
+$l_d$ & Comprimento do documento & Indica o número total de ocorrências de termos em um documento específico. \\
+\hline
+\end{tabular}
+\caption{Tabela de Definições}
+\label{tab:definicoes}
+\end{table}
+
+Agora está claro o que são os símbolos da notação que será utilizada, vamos finalmente compreender os conceitos chave desse artigo.
+
+A \textit{Verboseness}, conforme definida por Lipani et al. (2018), é expressa pela razão entre o comprimento do documento (\(l_d\)) e o número de termos distintos no documento (\(|T_d|\)). Essa relação é representada pela média do \(tf_d\) (sobre todos os termos) no documento \(d\):
+\[ v_d = \frac{l_d}{|T_d|} \quad (1)\]
+
+Um documento é considerado \textit{verbose} (verborrágico) se poucos termos são repetidos muitas vezes. O intervalo de seu domínio varia de 1 a \(l_d\), onde 1 indica não-verboso (nenhum termo ocorre mais de uma vez), e \(l_d\) indica o máximo de verbosidade (um termo é repetido \(l_d\) vezes).
+
+Por outro lado, a \textit{Burstiness}, também definida por Lipani et al. (2018), é refletida pela razão entre o comprimento do termo na coleção (\(l_t\)) e o número de documentos onde o termo ocorre (\(|D_t|\)). Essa relação representa a média de \(tf_d\) (sobre o número de documentos onde o termo \(t\) ocorre) na coleção:
+\[ b_t = \frac{l_t}{|D_t|} \quad (2)\]
+
+Um termo é considerado \textit{bursty} (irruptivo) se ocorre em poucos documentos muitas vezes. Seu domínio varia de 1 a \(l_t\), onde 1 indica um termo não-irruptivo (ocorre apenas uma vez em cada documento onde está presente), e \(l_t\) indica o máximo de irruptividade (todas as ocorrências estão em apenas um documento).
+
+\subsection{Contribuições}
+A utilização desses conceitos na normalização de modelos probabilísticos revela-se promissora, pois permite uma compreensão mais refinada das características intrínsecas dos textos. Essa abordagem inovadora pode contribuir para o aprimoramento das técnicas de recuperação de informações, especialmente em contextos dinâmicos de fluxos de dados online, como redes sociais e microblogs. Ao considerar a \textit{Verboseness} e a \textit{Burstiness} na normalização dos modelos, abre-se espaço para melhorias na precisão da identificação de tópicos emergentes e tendências em textos curtos, proporcionando avanços significativos na compreensão e aplicação das análises de dados textuais.
+
+\section{Fundamentos Teóricos}
+
+Na detecção de tópicos, um dos métodos fundamentais é a aplicação do peso tf-idf em análises textuais. Essa abordagem, como descrita por \cite{Benhardus2013}, consiste na avaliação da relevância de um documento em relação a uma consulta específica. O peso tf-idf é uma técnica de recuperação de informação que se baseia em dois componentes essenciais: a frequência do termo (tf) e a frequência inversa do documento (idf).
+
+A frequência do termo ($tf_{i,j}$) pode ser definida de duas maneiras: como o número de vezes que a palavra $i$ aparece no documento $j$ ou como a razão entre o número de vezes que a palavra $i$ ocorre no documento $j$ e o total de palavras no documento $j$ ($f_{i,j} = \frac{n_{i,j}}{M}$). A segunda definição de $tf_{i,j}$ é comumente conhecida como frequência do termo normalizada.
+
+Por outro lado, a frequência inversa do documento ($idf_i$) é determinada pelo logaritmo do quociente entre o número total de documentos $D$ e o número de documentos que contêm a palavra $i$ ($d_i$). Simplificadamente, o peso atribuído a um documento será maior se a palavra ocorrer mais vezes nele ou se a palavra estiver presente em menos documentos. Da mesma forma, o peso será menor se a palavra tiver uma frequência menor no documento ou estiver presente em mais documentos \cite{Hiemstra2000}.
+
+A aplicação do peso tf-idf na análise de documentos permite destacar termos relevantes e distintivos em relação ao contexto do corpus de documentos. Esse método se torna essencial na detecção de tópicos, pois permite identificar palavras-chave que podem representar os principais temas abordados nos textos analisados.
+
+A normalização do TF-IDF utilizando \textit{Verboseness} e \textit{Burstiness} pode ser realizada de duas maneiras distintas:
+
+\subsection{Normalização por \textit{Verboseness}}
+
+O TF-IDF é ajustado pelo inverso da \textit{Verboseness} do documento, resultando em valores menores de TF-IDF para documentos mais verbosos. Esse método parte da premissa de que documentos mais verbosos podem ser menos relevantes na identificação de tópicos por serem menos específicos.
+
+A fórmula para a normalização por \textit{Verboseness} é:
+
+\[
+\text{TF-IDF}_\text{v} = \text{TF-IDF} \times \frac{1}{v_d}
+\]
+
+\subsection{Normalização por \textit{Burstiness}}
+
+O TF-IDF é ajustado pelo inverso da \textit{Burstiness} do termo, resultando em valores menores de TF-IDF para termos mais irruptivos. Essa abordagem considera que termos mais irruptivos podem ser menos relevantes na identificação de tópicos por serem menos frequentes.
+
+A fórmula para a normalização por \textit{Burstiness} é:
+
+\[
+\text{TF-IDF}_\text{b} = \text{TF-IDF} \times \frac{1}{b_t}
+\]
+
+\subsection{Aplicações na Detecção de Tópicos}
+
+A normalização utilizando \textit{Verboseness} e \textit{Burstiness} pode ser aplicada na detecção de tópicos de duas maneiras distintas, proporcionando os seguintes benefícios:
+
+\begin{itemize}
+  \item \textbf{Melhoria da Precisão:} A normalização pode aprimorar a precisão na detecção de tópicos, reduzindo a influência de documentos e termos menos relevantes.
+  
+  \item \textbf{Identificação de Tópicos Emergentes e Tendências:} A aplicação desses métodos pode auxiliar na identificação de tópicos emergentes e tendências, diminuindo a influência de termos comuns e frequentes.
+\end{itemize}
+
+Essas técnicas fornecem uma maneira refinada de normalizar o TF-IDF, contribuindo para uma análise mais precisa e relevante na identificação de tópicos em conjuntos de dados textuais.
+
+
+\section{Trabalhos Relacionados}
+
+\subsection{Normalização em Modelos de Recuperação de Informação}
+
+O trabalho de Lipani et al. (2018) \cite{Lipani2018} oferece uma abordagem sistemática para a normalização em modelos probabilísticos, destacando a importância de considerar a verbosidade e a extensão dos documentos. A proposta deste estudo se alinha com a ideia apresentada por Lipani et al., visando expandir esses conceitos na identificação de tendências em textos curtos, particularmente em ambientes de redes sociais e microblogs.
+
+\subsection{Detecção de Tópicos Emergentes em Redes Sociais}
+
+Benhardus e Kalita (2013) \cite{Benhardus2013} abordam a detecção de tópicos emergentes em dados de streaming do Twitter, utilizando análises de frequência de termos para identificar tópicos populares. Seus resultados fornecem insights valiosos sobre a identificação de tópicos em tempo real, uma área de interesse semelhante à proposta deste artigo.
+
+\subsection{Métodos de Detecção de Tópicos em Mídias Sociais}
+
+Aiello et al. (2013) \cite{Aiello2013} e sua equipe propuseram e compararam métodos de detecção de tópicos em dados do Twitter. Suas descobertas ressaltam a importância de técnicas inovadoras para lidar com a grande quantidade de dados e a evolução temporal de tópicos em ambientes de mídia social, um aspecto relevante para a identificação precisa de tendências.
+
+\subsection{Comparações e Observações}
+
+Esses trabalhos demonstram uma variedade de abordagens e técnicas na identificação de tópicos emergentes em redes sociais. O presente estudo se diferencia ao propor uma combinação sistêmica de conceitos de normalização, visando melhorar a precisão na identificação de tendências, e busca avaliar empiricamente essa proposta em diferentes conjuntos de dados.
+
+Ao destacar essas contribuições anteriores, o presente artigo se posiciona como uma extensão significativa no estudo da normalização em modelos probabilísticos, com ênfase na identificação de tendências em textos curtos.
+
+
+\section{Experimentação e Resultados}
+
+
+\section{Conclusão}
+
+\begin{thebibliography}{00}
+\bibitem{Lipani2018}
+Lipani, A., Roelleke, T., Lupu, M. et al. A systematic approach to normalization in probabilistic models. Inf Retrieval J 21, 565–596 (2018). https://doi.org/10.1007/s10791-018-9334-1
+
+\bibitem{Benhardus2013}
+Benhardus, J., \& Kalita, J. (2013). Streaming trend detection in Twitter. International Journal of Web Based Communities, 9(1), 122. doi:10.1504/ijwbc.2013.051298
+
+\bibitem{Aiello2013}
+Aiello, L. M., Petkos, G., Martin, C., Corney, D., Papadopoulos, S., Skraba, R., … Jaimes, A. (2013). Sensing Trending Topics in Twitter. IEEE Transactions on Multimedia, 15(6), 1268–1282. doi:10.1109/tmm.2013.2265080 
+
+\bibitem{Hiemstra2000}
+Hiemstra, D. A probabilistic justification for using tf×idf term weighting in information retrieval . Int J Digit Libr 3, 131–139 (2000). https://doi.org/10.1007/s007999900025
+\end{thebibliography} 
+
+\end{document}
