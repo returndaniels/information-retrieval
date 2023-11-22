@@ -1,41 +1,47 @@
-\documentclass[12pt]{article}
-\usepackage{cite}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{array}
-\usepackage{float}
-\usepackage{algorithmic}
+% This is samplepaper.tex, a sample chapter demonstrating the
+% LLNCS macro package for Springer Computer Science proceedings;
+% Version 2.20 of 2017/10/04
+%
+\documentclass[runningheads]{llncs}
+%
 \usepackage{graphicx}
-\usepackage{textcomp}
-\usepackage{xcolor}
-\usepackage[portuguese]{babel}
+\usepackage{float}
 
-\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
-    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+% Used for displaying a sample figure. If possible, figure files should
+% be included in EPS format.
+%
+% If you use the hyperref package, please uncomment the following line
+% to display URLs in blue roman font according to Springer's eBook style:
+% \renewcommand\UrlFont{\color{blue}\rmfamily}
 
 \begin{document}
-
-\title{
-    \textit{
-        \textbf{
-            Aprimoramento da Normalização em Modelos Probabilísticos para Identificação de Tendências: Integrando Verboseness e Burstiness
-        }
-    }
-}
-
-\author{Daniel S. Silva \\
-    \textit{Instituto de Computação} \\
-    \textit{Universidade Federal do Rio de Janeiro (UFRJ)}\\
-    Rio de Janeiro, Brasil \\
-    \textit{danielss@dcc.ufrj.br}
-}
-
-\maketitle
-
+%
+\title{Aprimoramento da Normalização em Modelos Probabilísticos para Identificação de Tendências: Integrando Verboseness e Burstiness}
+%
+%\titlerunning{Abbreviated paper title}
+% If the paper title is too long for the running head, you can set
+% an abbreviated paper title here
+%
+\author{Daniel S. Silva}
+%
+% \authorrunning{F. Author et al.}
+% First names are abbreviated in the running head.
+% If there are more than two authors, 'et al.' is used.
+%
+\institute{Instituto de Computação, Universidade Federal do Rio de Janeiro (UFRJ) Rio de Janeiro RJ, Brasil\\
+\email{danielss@dcc.ufrj.br}\\
+\url{https://dcc.ufrj.br/}}
+%
+\maketitle              % typeset the header of the contribution
+%
 \begin{abstract}
 Este artigo propõe uma expansão significativa no estudo da normalização em modelos probabilísticos para identificação de tendências, incorporando a abordagem sistemática apresentada por Lipani et al. (2018) sobre \textit{Verboseness} e \textit{Burstiness}. A proposta visa investigar como a combinação desses conceitos pode melhorar a precisão na identificação de tópicos emergentes em textos curtos, como os encontrados em redes sociais e microblogs. Pretende-se realizar experimentos usando conjuntos de dados diversos para avaliar a eficácia do novo método de normalização proposto em comparação com os modelos tradicionais. Os resultados esperados incluem a descoberta de insights relevantes sobre a viabilidade e eficácia do novo método, com potencial para avanços significativos na área de recuperação de informações e na identificação precisa de tendências em textos curtos.
 
-\textbf{\textit{Palavras-chave---}}Identificação de tendências, Tópicos emergentes, Verboseness, Burstiness, tf-idf, Redes sociais, Microblogs
+\keywords{Identificação de tendências \and Tópicos emergentes \and Verboseness \and Burstiness \and tf-idf \and Redes sociais \and Microblogs.}
 \end{abstract}
+%
+%
+%
 
 \section{Introdução}
 
@@ -107,7 +113,7 @@ O TF-IDF é ajustado pelo inverso da \textit{Verboseness} do documento, resultan
 A fórmula para a normalização por \textit{Verboseness} é:
 
 \[
-\text{TF-IDF}_\text{v} = \text{TF-IDF} \times \frac{1}{v_d}
+TF-IDF_{v} = TF-IDF \times \frac{1}{v_d}
 \]
 
 \subsection{Normalização por \textit{Burstiness}}
@@ -117,7 +123,7 @@ O TF-IDF é ajustado pelo inverso da \textit{Burstiness} do termo, resultando em
 A fórmula para a normalização por \textit{Burstiness} é:
 
 \[
-\text{TF-IDF}_\text{b} = \text{TF-IDF} \times \frac{1}{b_t}
+TF-IDF_{b} = TF-IDF \times \frac{1}{b_t}
 \]
 
 \subsection{Aplicações na Detecção de Tópicos}
@@ -158,19 +164,26 @@ Ao destacar essas contribuições anteriores, o presente artigo se posiciona com
 
 
 \section{Conclusão}
-
-\begin{thebibliography}{00}
+%
+% ---- Bibliography ----
+%
+% BibTeX users should specify bibliography style 'splncs04'.
+% References will then be sorted and formatted in the correct style.
+%
+% \bibliographystyle{splncs04}
+% \bibliography{mybibliography}
+%
+\begin{thebibliography}{8}
 \bibitem{Lipani2018}
-Lipani, A., Roelleke, T., Lupu, M. et al. A systematic approach to normalization in probabilistic models. Inf Retrieval J 21, 565–596 (2018). https://doi.org/10.1007/s10791-018-9334-1
+Lipani, A., Roelleke, T., Lupu, M. et al. A systematic approach to normalization in probabilistic models. Inf Retrieval J 21, 565–596 (2018). \doi{10.1007/s10791-018-9334-1}
 
 \bibitem{Benhardus2013}
-Benhardus, J., \& Kalita, J. (2013). Streaming trend detection in Twitter. International Journal of Web Based Communities, 9(1), 122. doi:10.1504/ijwbc.2013.051298
+Benhardus, J., \& Kalita, J. (2013). Streaming trend detection in Twitter. International Journal of Web Based Communities, 9(1), 122. \doi{10.1504/ijwbc.2013.051298}
 
 \bibitem{Aiello2013}
-Aiello, L. M., Petkos, G., Martin, C., Corney, D., Papadopoulos, S., Skraba, R., … Jaimes, A. (2013). Sensing Trending Topics in Twitter. IEEE Transactions on Multimedia, 15(6), 1268–1282. doi:10.1109/tmm.2013.2265080 
+Aiello, L. M., Petkos, G., Martin, C., Corney, D., Papadopoulos, S., Skraba, R., … Jaimes, A. (2013). Sensing Trending Topics in Twitter. IEEE Transactions on Multimedia, 15(6), 1268–1282. \doi{10.1109/tmm.2013.2265080} 
 
 \bibitem{Hiemstra2000}
-Hiemstra, D. A probabilistic justification for using tf×idf term weighting in information retrieval . Int J Digit Libr 3, 131–139 (2000). https://doi.org/10.1007/s007999900025
-\end{thebibliography} 
-
+Hiemstra, D. A probabilistic justification for using tf×idf term weighting in information retrieval . Int J Digit Libr 3, 131–139 (2000). \doi{10.1007/s007999900025}
+\end{thebibliography}
 \end{document}
