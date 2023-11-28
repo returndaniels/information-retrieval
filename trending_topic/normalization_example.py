@@ -1,12 +1,15 @@
+import pandas as pd
 from collections import defaultdict
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.datasets import fetch_20newsgroups
+
 import re
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
 
-def preprocess_documents(data: list, lang: str = "english"):
+def preprocess_documents(
+    data: list, lang: str = "english", custom_stopwords: list = None
+):
     """
     Pré-processa os documentos removendo pontuações, stopwords e palavras com apenas uma letra.
 
@@ -19,6 +22,9 @@ def preprocess_documents(data: list, lang: str = "english"):
     """
     processed_data = []
     stop_words = set(stopwords.words(lang))
+
+    if custom_stopwords:
+        stop_words.update(custom_stopwords)
 
     for doc in data:
         # Remover pontuações e caracteres especiais, converter para minúsculas
@@ -141,12 +147,26 @@ def sort_terms_by_tfidf(sorted_terms: list):
     return sorted(sorted_terms, key=lambda x: x[1], reverse=True)
 
 
+def get_data_from_csv(data_path: str, data_col: str):
+    dataset = pd.read_csv(data_path, delimiter=";")
+    data = dataset.loc[:, data_col].values
+    return data
+
+
 def main():
     # Carregando uma coleção de documentos de exemplo
-    data = fetch_20newsgroups(subset="train").data
+    data_path = "./datasets/twitter_ptbr_train_datasets/Train50.csv"
+    data_col = "tweet_text"
+    data = get_data_from_csv(data_path=data_path, data_col=data_col)
 
     # Pré-processamento dos documentos
-    processed_data = preprocess_documents(data)
+    df = pd.read_fwf("./stopwords-pt-br.txt", header=None)
+    custom_stopwords = df.values.tolist()
+    custom_stopwords = [s[0] for s in custom_stopwords]
+
+    processed_data = preprocess_documents(
+        data, lang="portuguese", custom_stopwords=custom_stopwords
+    )
 
     # Calculando os scores TF-IDF
     scored_terms = calculate_tfidf(processed_data=processed_data)  # , max_terms=10000)
