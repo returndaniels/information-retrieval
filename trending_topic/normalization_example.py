@@ -50,7 +50,7 @@ def preprocess_documents(data, lang="english", custom_stopwords=None):
     return processed_data
 
 
-def calculate_verboseness(processed_data: list, max_docs=None):
+def calculate_verboseness(processed_data: list, max_docs: int = None):
     """
     Calcula a Verboseness dos documentos pré-processados.
 
@@ -73,24 +73,24 @@ def calculate_verboseness(processed_data: list, max_docs=None):
     return verbose_values
 
 
-def calculate_burstiness(terms_matrix):
+def calculate_burstiness(terms_matrix, terms):
     """
     Calcula a Burstiness dos termos nos documentos.
 
     Args:
     - terms_matrix: Matriz de termos nos documentos.
+    - terms: Array de termos dos documentos.
 
     Returns:
     - defaultdict: Dicionário contendo os valores de Burstiness por termo.
     """
     bursty_values = defaultdict(float)
 
-    for i, term in enumerate(terms_matrix.T):
+    for i, term in enumerate(terms):
         term_occurrences = terms_matrix[:, i]
         num_docs_with_term = (term_occurrences > 0).sum()
-        # total_term_occurrences = term_occurrences.sum()
-        total_term_occurrences = term.sum()
-        bursty_values[i] = (
+        total_term_occurrences = term_occurrences.sum()
+        bursty_values[term] = (
             total_term_occurrences / num_docs_with_term
             if num_docs_with_term != 0
             else 0.0
@@ -115,13 +115,28 @@ def calculate_tfidf(processed_data, max_docs=None):
     terms = tfidf_vectorizer.get_feature_names_out()
 
     verbose_values = calculate_verboseness(processed_data, max_docs)
-    bursty_values = calculate_burstiness(tfidf_matrix)
+    bursty_values = calculate_burstiness(tfidf_matrix, terms)
 
     term_scores = {}
     for i, term in enumerate(terms):
+        term_occurrences = tfidf_matrix[:, i]
+
+        # Encontrando os índices dos documentos que possuem o termo
+        doc_indices_with_term = [
+            idx for idx, occurrence in enumerate(term_occurrences) if occurrence > 0
+        ]
+
+        # Calculando a Verboseness média dos documentos que possuem o termo
+        mean_verbose_with_term = (
+            sum(verbose_values[d] for d in doc_indices_with_term)
+            / len(doc_indices_with_term)
+            if len(doc_indices_with_term) > 0
+            else 0.0
+        )
+
         term_scores[term] = (
-            tfidf_matrix[:, i].mean() / (verbose_values[i] * bursty_values[i])
-            if verbose_values[i] != 0
+            tfidf_matrix[:, i].mean() / (mean_verbose_with_term * bursty_values[term])
+            if bursty_values[term] * mean_verbose_with_term != 0
             else 0.0
         )
 
