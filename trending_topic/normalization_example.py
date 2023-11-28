@@ -1,24 +1,31 @@
-import pandas as pd
-from collections import defaultdict
-from sklearn.feature_extraction.text import TfidfVectorizer
-
 import re
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from collections import defaultdict
+
+NGRAM_RANGE = (1, 2)
+NUM_TOP_TERMS = 100
+MAX_DOCS_PREPROCESS = 250
+DATA_LANG = "portuguese"
+PATH_DATASET = "./datasets/twitter_ptbr_train_datasets/Train50.csv"
+PATH_STOPWORDS = "./stopwords-pt-br.txt"
+CONTENT_COL = "tweet_text"
+CSV_DELIMITER = ";"
 
 
-def preprocess_documents(
-    data: list, lang: str = "english", custom_stopwords: list = None
-):
+def preprocess_documents(data, lang="english", custom_stopwords=None):
     """
-    Pré-processa os documentos removendo pontuações, stopwords e palavras com apenas uma letra.
+    Realiza o pré-processamento dos documentos removendo pontuações, stopwords e palavras com apenas uma letra.
 
     Args:
     - data (list): Lista de strings representando os documentos.
-    - lang (str): String com o idioma dos docuemntos a serem tratados.
+    - lang (str): Idioma dos documentos a serem tratados.
+    - custom_stopwords (list): Lista de stopwords personalizadas a serem adicionadas.
 
     Returns:
-    - list: Lista de strings contendo documentos pré-processados.
+    - list: Lista de strings contendo os documentos pré-processados.
     """
     processed_data = []
     stop_words = set(stopwords.words(lang))
@@ -29,9 +36,7 @@ def preprocess_documents(
     for doc in data:
         # Remover pontuações e caracteres especiais, converter para minúsculas
         doc = re.sub(r"[^a-zA-Z\s]", " ", doc.lower())
-
-        # Tokenizar as palavras
-        tokens = word_tokenize(doc)
+        tokens = word_tokenize(doc)  # Tokenizar as palavras
 
         # Remover stopwords e palavras com apenas uma letra
         filtered_tokens = [
@@ -45,83 +50,88 @@ def preprocess_documents(
     return processed_data
 
 
-def calculate_tfidf(processed_data: list, max_terms: int = None):
+def calculate_verboseness(processed_data: list, max_docs=None):
     """
-    Calcula os scores TF-IDF normalizados por Verboseness e Burstiness dos termos nos documentos pré-processados.
+    Calcula a Verboseness dos documentos pré-processados.
 
     Args:
     - processed_data (list): Lista de strings representando os documentos pré-processados.
-    - max_terms (int): Número máximo de termos a serem considerados.
+    - max_docs (int): Número máximo de documentos a serem considerados.
 
     Returns:
-    - list: Lista de tuplas contendo os termos e seus scores TF-IDF normalizados por Verboseness e Burstiness,
-            ordenados por relevância.
+    - defaultdict: Dicionário contendo os valores de Verboseness por documento.
     """
-    tfidf_vectorizer = TfidfVectorizer()
-    tfidf_matrix = tfidf_vectorizer.fit_transform(processed_data)
-
-    # Obtendo os termos (palavras) e seus scores TF-IDF
-    terms = tfidf_vectorizer.get_feature_names_out()
-    if max_terms:
-        terms = terms[:max_terms]
-
-    # Criando um dicionário para armazenar os termos e seus scores TF-IDF
     verbose_values = defaultdict(float)
-    bursty_values = defaultdict(float)
 
-    # Calculando a Verboseness por documento
-    for i in range(len(processed_data)):
-        # Selecionando apenas as ocorrências do documento i
-        doc_occurrences = tfidf_matrix[i, :]
-
-        # Calculando o comprimento do documento
-        document_length = doc_occurrences.sum()
-
-        # Calculando o número de termos distintos no documento
-        distinct_terms = (doc_occurrences > 0).sum()
-
-        # Calculando a Verboseness para o documento i
+    for i, doc in enumerate(processed_data[:max_docs]):
+        distinct_terms = len(set(doc.split()))
+        document_length = len(doc)
         verbose_values[i] = (
             document_length / distinct_terms if distinct_terms != 0 else 0.0
         )
 
-    # Calculando a Burstiness por termo
-    for i, term in enumerate(terms):
-        term_occurrences = tfidf_matrix[:, i]
+    return verbose_values
 
-        # Calculando o número de documentos onde o termo ocorre
+
+def calculate_burstiness(terms_matrix):
+    """
+    Calcula a Burstiness dos termos nos documentos.
+
+    Args:
+    - terms_matrix: Matriz de termos nos documentos.
+
+    Returns:
+    - defaultdict: Dicionário contendo os valores de Burstiness por termo.
+    """
+    bursty_values = defaultdict(float)
+
+    for i, term in enumerate(terms_matrix.T):
+        term_occurrences = terms_matrix[:, i]
         num_docs_with_term = (term_occurrences > 0).sum()
-
-        # Calculando o total de ocorrências do termo
-        total_term_occurrences = term_occurrences.sum()
-
-        # Calculando a Burstiness para o termo
-        bursty_values[term] = (
+        # total_term_occurrences = term_occurrences.sum()
+        total_term_occurrences = term.sum()
+        bursty_values[i] = (
             total_term_occurrences / num_docs_with_term
             if num_docs_with_term != 0
             else 0.0
         )
 
-    # Normalizando os scores TF-IDF com base em Verboseness e Burstiness
+    return bursty_values
+
+
+def calculate_tfidf(processed_data, max_docs=None):
+    """
+    Calcula os scores TF-IDF normalizados por Verboseness e Burstiness dos termos nos documentos pré-processados.
+
+    Args:
+    - processed_data (list): Lista de strings representando os documentos pré-processados.
+    - max_docs (int): Número máximo de documentos a serem considerados.
+
+    Returns:
+    - list: Lista de tuplas contendo os termos e seus scores TF-IDF normalizados por Verboseness e Burstiness, ordenados por relevância.
+    """
+    tfidf_vectorizer = TfidfVectorizer(ngram_range=NGRAM_RANGE)
+    tfidf_matrix = tfidf_vectorizer.fit_transform(processed_data[:max_docs])
+    terms = tfidf_vectorizer.get_feature_names_out()
+
+    verbose_values = calculate_verboseness(processed_data, max_docs)
+    bursty_values = calculate_burstiness(tfidf_matrix)
+
     term_scores = {}
     for i, term in enumerate(terms):
-        # Calculando o TF-IDF normalizado
-        # term_scores[term] = tfidf_matrix[:, i].mean()
         term_scores[term] = (
-            tfidf_matrix[:, i].mean() / (verbose_values[i] * bursty_values[term])
+            tfidf_matrix[:, i].mean() / (verbose_values[i] * bursty_values[i])
             if verbose_values[i] != 0
             else 0.0
         )
 
-    # Ordenando os termos por TF-IDF normalizado
     sorted_normalized_tfidf = sorted(
         term_scores.items(), key=lambda x: x[1], reverse=True
     )
-
     return sorted_normalized_tfidf
 
 
-def display_top_terms(sorted_terms: list, num_top_terms: int = 10):
+def display_top_terms(sorted_terms, num_top_terms=NUM_TOP_TERMS):
     """
     Exibe os termos mais relevantes.
 
@@ -134,48 +144,30 @@ def display_top_terms(sorted_terms: list, num_top_terms: int = 10):
         print(f"{term}: {score}")
 
 
-def sort_terms_by_tfidf(sorted_terms: list):
-    """
-    Ordena os termos por scores TF-IDF do mais relevante ao menos relevante.
-
-    Args:
-    - sorted_terms (list): Lista de tuplas com termos e seus scores TF-IDF ordenados por relevância.
-
-    Returns:
-    - list: Lista de tuplas com os termos ordenados por scores TF-IDF.
-    """
-    return sorted(sorted_terms, key=lambda x: x[1], reverse=True)
-
-
-def get_data_from_csv(data_path: str, data_col: str):
-    dataset = pd.read_csv(data_path, delimiter=";")
-    data = dataset.loc[:, data_col].values
-    return data
-
-
 def main():
+    """
+    Função principal para executar todo o fluxo de trabalho.
+    """
     # Carregando uma coleção de documentos de exemplo
-    data_path = "./datasets/twitter_ptbr_train_datasets/Train50.csv"
-    data_col = "tweet_text"
-    data = get_data_from_csv(data_path=data_path, data_col=data_col)
+    data_path = PATH_DATASET
+    data_col = CONTENT_COL
+    data = pd.read_csv(data_path, delimiter=CSV_DELIMITER)[data_col].values
 
     # Pré-processamento dos documentos
-    df = pd.read_fwf("./stopwords-pt-br.txt", header=None)
+    df = pd.read_fwf(PATH_STOPWORDS, header=None)
     custom_stopwords = df.values.tolist()
     custom_stopwords = [s[0] for s in custom_stopwords]
-
     processed_data = preprocess_documents(
-        data, lang="portuguese", custom_stopwords=custom_stopwords
+        data, lang=DATA_LANG, custom_stopwords=custom_stopwords
     )
 
     # Calculando os scores TF-IDF
-    scored_terms = calculate_tfidf(processed_data=processed_data)  # , max_terms=10000)
-
-    # Ordenar os termos por relevância de TF-IDF
-    sorted_terms = sort_terms_by_tfidf(scored_terms)
+    scored_terms = calculate_tfidf(
+        processed_data=processed_data, max_docs=MAX_DOCS_PREPROCESS
+    )
 
     # Exibindo os termos mais relevantes
-    display_top_terms(sorted_terms=sorted_terms, num_top_terms=100)
+    display_top_terms(scored_terms, num_top_terms=NUM_TOP_TERMS)
 
 
 if __name__ == "__main__":
