@@ -5,7 +5,7 @@ from collections import defaultdict
 # Leitura do arquivo e armazenamento dos termos e suas pontuações TF-IDF
 file_content = []
 
-with open("out", "r", encoding="utf-8") as file:
+with open("output/train50_top100_ng4_docs500_01.txt", "r", encoding="utf-8") as file:
     for line in file:
         term, tfidf_score = line.split(":")
         file_content.append(term.strip())
@@ -18,7 +18,7 @@ tfidf_matrix = vectorizer.fit_transform(file_content)
 similarities = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 # Definindo um limite de similaridade para o agrupamento
-threshold = 0.65
+threshold = 0.25
 
 # Agrupamento dos termos com alta similaridade
 similar_items = defaultdict(list)

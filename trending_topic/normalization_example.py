@@ -5,22 +5,23 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.corpus import stopwords
 from nltk.tokenize.casual import TweetTokenizer
+
+from dotenv import load_dotenv
 import datetime
 import os
 
-# from nltk.tokenize import word_tokenize
-# from nltk.stem.porter import PorterStemmer
+load_dotenv()
 
-NGRAM_RANGE = (1, 4)
-NUM_TOP_TERMS = 100
-MAX_DOCS_PREPROCESS = 400
-DATA_LANG = "portuguese"
-PATH_DATASET = "./datasets/twitter_ptbr_train_datasets/Train500.csv"
-PATH_STOPWORDS = "./stopwords/stopwords-pt-br.txt"
-CONTENT_COL = "tweet_text"
-CSV_DELIMITER = ";"
-OUTPUT_DIR = "output"
-OUTPUT_FILENAME = "top_terms_"
+NGRAM_RANGE = eval(os.getenv("NGRAM_RANGE"))
+NUM_TOP_TERMS = int(os.getenv("NUM_TOP_TERMS"))
+MAX_DOCS_PREPROCESS = eval(os.getenv("MAX_DOCS_PREPROCESS"))
+DATA_LANG = os.getenv("DATA_LANG")
+PATH_DATASET = os.getenv("PATH_DATASET")
+PATH_STOPWORDS = os.getenv("PATH_STOPWORDS")
+CONTENT_COL = os.getenv("CONTENT_COL")
+CSV_DELIMITER = os.getenv("CSV_DELIMITER")
+OUTPUT_DIR = os.getenv("OUTPUT_DIR")
+OUTPUT_FILENAME = os.getenv("OUTPUT_FILENAME")
 
 
 def get_stopwords():
@@ -104,7 +105,7 @@ def calculate_burstiness(terms_matrix, terms):
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
 
-def calculate_tfidf(processed_data, max_docs=None):
+def calculate_tfidf(processed_data):
     """
     Calcula os scores TF-IDF normalizados por Verboseness e Burstiness dos termos nos documentos pré-processados.
 
@@ -118,7 +119,7 @@ def calculate_tfidf(processed_data, max_docs=None):
     tfidf_vectorizer = TfidfVectorizer(ngram_range=NGRAM_RANGE)
     count_vectorizer = CountVectorizer(ngram_range=NGRAM_RANGE)
 
-    tfidf_matrix = tfidf_vectorizer.fit_transform(processed_data[:max_docs])
+    tfidf_matrix = tfidf_vectorizer.fit_transform(processed_data)
     terms = tfidf_vectorizer.get_feature_names_out()
 
     stop_words = get_stopwords()
@@ -126,9 +127,9 @@ def calculate_tfidf(processed_data, max_docs=None):
         term for term in terms if term.split()[-1] not in stop_words and len(term) > 3
     ]
 
-    count_matrix = count_vectorizer.fit_transform(processed_data[:max_docs])
+    count_matrix = count_vectorizer.fit_transform(processed_data)
 
-    verbose_values = calculate_verboseness(processed_data[:max_docs])
+    verbose_values = calculate_verboseness(processed_data)
     bursty_values = calculate_burstiness(count_matrix, filtered_terms)
 
     term_scores = {}
@@ -177,7 +178,7 @@ def display_top_terms(
         if filename.startswith(OUTPUT_FILENAME)
     ]
     last_number = max(
-        [int(file.split("_")[2].split(".")[0]) for file in existing_files], default=0
+        [int(file.split("_")[-1].split(".")[0]) for file in existing_files], default=0
     )
     next_number = last_number + 1
     output_file = os.path.join(output_dir, f"{OUTPUT_FILENAME}{next_number:02d}.txt")
@@ -197,7 +198,9 @@ def main():
     # Carregando uma coleção de documentos de exemplo
     data_path = PATH_DATASET
     data_col = CONTENT_COL
-    data = pd.read_csv(data_path, delimiter=CSV_DELIMITER)[data_col].values
+    data = pd.read_csv(data_path, delimiter=CSV_DELIMITER, nrows=MAX_DOCS_PREPROCESS)[
+        data_col
+    ].values
 
     start_preprocess_time = datetime.datetime.now()
     print("Iniciando o pré-processamento dos documentos...")
@@ -208,9 +211,7 @@ def main():
 
     start_tfidf_time = datetime.datetime.now()
     print("Calculando os scores TF-IDF...")
-    scored_terms = calculate_tfidf(
-        processed_data=processed_data, max_docs=MAX_DOCS_PREPROCESS
-    )
+    scored_terms = calculate_tfidf(processed_data=processed_data)
     end_tfidf_time = datetime.datetime.now()
     tfidf_duration = end_tfidf_time - start_tfidf_time
     print(f"Cálculo TF-IDF concluído. Tempo decorrido: {tfidf_duration}")
