@@ -1,11 +1,12 @@
+#!/usr/bin/python3
 import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.corpus import stopwords
 from nltk.tokenize.casual import TweetTokenizer
-from collections import defaultdict
 import datetime
+import os
 
 # from nltk.tokenize import word_tokenize
 # from nltk.stem.porter import PorterStemmer
@@ -14,10 +15,12 @@ NGRAM_RANGE = (1, 4)
 NUM_TOP_TERMS = 100
 MAX_DOCS_PREPROCESS = 400
 DATA_LANG = "portuguese"
-PATH_DATASET = "./datasets/twitter_ptbr_train_datasets/Train50.csv"
-PATH_STOPWORDS = "./stopwords-pt-br.txt"
+PATH_DATASET = "./datasets/twitter_ptbr_train_datasets/Train500.csv"
+PATH_STOPWORDS = "./stopwords/stopwords-pt-br.txt"
 CONTENT_COL = "tweet_text"
 CSV_DELIMITER = ";"
+OUTPUT_DIR = "output"
+OUTPUT_FILENAME = "top_terms_"
 
 
 def get_stopwords():
@@ -61,18 +64,20 @@ def calculate_verboseness(processed_data: list):
     - processed_data (list): Lista de strings representando os documentos pré-processados.
 
     Returns:
-    - defaultdict: Dicionário contendo os valores de Verboseness por documento.
+    - ict: Dicionário contendo os valores de Verboseness por documento.
     """
-    verbose_values = defaultdict(float)
+    document_lengths = np.array([len(doc.split()) for doc in processed_data])
+    distinct_terms = np.array([len(set(doc.split())) for doc in processed_data])
 
-    for i, doc in enumerate(processed_data):
-        distinct_terms = len(set(doc.split()))
-        document_length = len(doc.split())
-        verbose_values[i] = (
-            document_length / distinct_terms if distinct_terms != 0 else 0.0
+    verbose_values = None
+    with np.errstate(divide="ignore", invalid="ignore"):
+        verbose_values = np.where(
+            distinct_terms != 0, document_lengths / distinct_terms, 0.0
         )
 
-    return verbose_values
+    verbose_values_dict = dict(zip(range(len(verbose_values)), verbose_values))
+
+    return verbose_values_dict
 
 
 def calculate_burstiness(terms_matrix, terms):
@@ -84,29 +89,19 @@ def calculate_burstiness(terms_matrix, terms):
     - terms: Array de termos dos documentos.
 
     Returns:
-    - defaultdict: Dicionário contendo os valores de Burstiness por termo.
+    - dict: Dicionário contendo os valores de Burstiness por termo.
     """
     dense_matrix = terms_matrix.toarray()
-    term_occurrences = np.sum(dense_matrix > 0, axis=0)
-    term_occurrences_dict = dict(zip(terms, term_occurrences))
+    docs_with_term = np.sum(dense_matrix > 0, axis=0)
+    term_counts = np.sum(dense_matrix, axis=0)
+    bursty_values = None
+    with np.errstate(divide="ignore", invalid="ignore"):
+        bursty_values = np.where(docs_with_term != 0, term_counts / docs_with_term, 0.0)
 
-    term_counts = dict(zip(terms, terms_matrix.sum(axis=0).A1))
+    return dict(zip(terms, bursty_values))
 
-    bursty_values = defaultdict(float)
-    for i, term in enumerate(terms):
-        num_docs_with_term = term_occurrences_dict[term]
-        total_term_occurrences = term_counts[term]
 
-        bursty_values[term] = (
-            total_term_occurrences / num_docs_with_term
-            if num_docs_with_term != 0
-            else 0.0
-        )
-
-        if "perfeitamente" == term or "indo" == term:
-            print(term, total_term_occurrences, num_docs_with_term, bursty_values[term])
-
-    return bursty_values
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
 
 def calculate_tfidf(processed_data, max_docs=None):
@@ -141,20 +136,17 @@ def calculate_tfidf(processed_data, max_docs=None):
         term_occurrences = tfidf_matrix[:, i]
 
         # Encontrando os índices dos documentos que possuem o termo
-        doc_indices_with_term = [
-            idx for idx, occurrence in enumerate(term_occurrences) if occurrence > 0
-        ]
+        doc_indices_with_term = term_occurrences.nonzero()[0]
 
         # Calculando a Verboseness média dos documentos que possuem o termo
         mean_verbose_with_term = (
-            sum(verbose_values[d] for d in doc_indices_with_term)
-            / len(doc_indices_with_term)
+            np.mean([verbose_values[d] for d in doc_indices_with_term])
             if len(doc_indices_with_term) > 0
             else 0.0
         )
 
         term_scores[term] = (
-            tfidf_matrix[:, i].mean() / (mean_verbose_with_term * bursty_values[term])
+            term_occurrences.mean() / (mean_verbose_with_term * bursty_values[term])
             if bursty_values[term] * mean_verbose_with_term != 0
             else 0.0
         )
@@ -165,17 +157,34 @@ def calculate_tfidf(processed_data, max_docs=None):
     return sorted_normalized_tfidf
 
 
-def display_top_terms(sorted_terms: list, num_top_terms: int = None):
+def display_top_terms(
+    sorted_terms: list, num_top_terms: int = None, output_dir: str = OUTPUT_DIR
+):
     """
-    Exibe os termos mais relevantes.
+    Escreve os termos mais relevantes no arquivo de saída.
 
     Args:
     - sorted_terms (list): Lista de tuplas com termos e seus scores TF-IDF ordenados por relevância.
     - num_top_terms (int): Número de termos a serem exibidos.
+    - output_dir (str): Pasta onde será escrito o arquivo de saída.
     """
-    print(f"Top {num_top_terms if num_top_terms else 'N'} termos em trending topics:")
-    for term, score in sorted_terms[:num_top_terms]:
-        print(f"{term}: {score}")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    existing_files = [
+        filename
+        for filename in os.listdir(output_dir)
+        if filename.startswith(OUTPUT_FILENAME)
+    ]
+    last_number = max(
+        [int(file.split("_")[2].split(".")[0]) for file in existing_files], default=0
+    )
+    next_number = last_number + 1
+    output_file = os.path.join(output_dir, f"{OUTPUT_FILENAME}{next_number:02d}.txt")
+
+    with open(output_file, "w") as file:
+        for term, score in sorted_terms[:num_top_terms]:
+            file.write(f"{term}: {score}\n")
 
 
 def main():
@@ -208,7 +217,7 @@ def main():
 
     start_display_time = datetime.datetime.now()
     print("Exibindo os termos mais relevantes...")
-    display_top_terms(scored_terms)  # , num_top_terms=NUM_TOP_TERMS)
+    display_top_terms(scored_terms, num_top_terms=NUM_TOP_TERMS)
     end_display_time = datetime.datetime.now()
     display_duration = end_display_time - start_display_time
     print(f"Exibição concluída. Tempo decorrido: {display_duration}")
