@@ -8,12 +8,12 @@ from nltk.tokenize.casual import TweetTokenizer
 
 from dotenv import load_dotenv
 import datetime
+import csv
 import os
 
 load_dotenv()
 
 NGRAM_RANGE = eval(os.getenv("NGRAM_RANGE"))
-NUM_TOP_TERMS = int(os.getenv("NUM_TOP_TERMS"))
 MAX_DOCS_PREPROCESS = eval(os.getenv("MAX_DOCS_PREPROCESS"))
 DATA_LANG = os.getenv("DATA_LANG")
 PATH_DATASET = os.getenv("PATH_DATASET")
@@ -102,19 +102,15 @@ def calculate_burstiness(terms_matrix, terms):
     return dict(zip(terms, bursty_values))
 
 
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-
-
 def calculate_tfidf(processed_data):
     """
     Calcula os scores TF-IDF normalizados por Verboseness e Burstiness dos termos nos documentos pré-processados.
 
     Args:
     - processed_data (list): Lista de strings representando os documentos pré-processados.
-    - max_docs (int): Número máximo de documentos a serem considerados.
 
     Returns:
-    - list: Lista de tuplas contendo os termos e seus scores TF-IDF normalizados por Verboseness e Burstiness, ordenados por relevância.
+    - dict: Dicionário contendo os termos e seus scores TF-IDF normalizados por Verboseness e Burstiness, ordenados por relevância.
     """
     tfidf_vectorizer = TfidfVectorizer(ngram_range=NGRAM_RANGE)
     count_vectorizer = CountVectorizer(ngram_range=NGRAM_RANGE)
@@ -135,40 +131,30 @@ def calculate_tfidf(processed_data):
     term_scores = {}
     for i, term in enumerate(filtered_terms):
         term_occurrences = tfidf_matrix[:, i]
-
-        # Encontrando os índices dos documentos que possuem o termo
+        term_index = tfidf_vectorizer.vocabulary_.get(term)
+        term_tf_idf = tfidf_matrix[:, term_index].toarray().sum()
         doc_indices_with_term = term_occurrences.nonzero()[0]
-
-        # Calculando a Verboseness média dos documentos que possuem o termo
         mean_verbose_with_term = (
             np.mean([verbose_values[d] for d in doc_indices_with_term])
             if len(doc_indices_with_term) > 0
             else 0.0
         )
 
-        term_scores[term] = (
-            term_occurrences.mean() / (mean_verbose_with_term * bursty_values[term])
-            if bursty_values[term] * mean_verbose_with_term != 0
-            else 0.0
-        )
+        adjusted_score = term_tf_idf / (mean_verbose_with_term * bursty_values[term])
+        term_scores[term] = {
+            "adjusted_score": adjusted_score,
+            "TF-IDF": term_tf_idf,
+            "mean_verbose_with_term": mean_verbose_with_term,
+            "bursty_values": bursty_values[term],
+        }
 
     sorted_normalized_tfidf = sorted(
-        term_scores.items(), key=lambda x: x[1], reverse=True
+        term_scores.items(), key=lambda x: x[1]["adjusted_score"], reverse=True
     )
-    return sorted_normalized_tfidf
+    return {term: values for term, values in sorted_normalized_tfidf}
 
 
-def display_top_terms(
-    sorted_terms: list, num_top_terms: int = None, output_dir: str = OUTPUT_DIR
-):
-    """
-    Escreve os termos mais relevantes no arquivo de saída.
-
-    Args:
-    - sorted_terms (list): Lista de tuplas com termos e seus scores TF-IDF ordenados por relevância.
-    - num_top_terms (int): Número de termos a serem exibidos.
-    - output_dir (str): Pasta onde será escrito o arquivo de saída.
-    """
+def write_top_terms(scored_terms: dict, output_dir: str = OUTPUT_DIR):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -181,11 +167,31 @@ def display_top_terms(
         [int(file.split("_")[-1].split(".")[0]) for file in existing_files], default=0
     )
     next_number = last_number + 1
-    output_file = os.path.join(output_dir, f"{OUTPUT_FILENAME}{next_number:02d}.txt")
+    output_file = os.path.join(output_dir, f"{OUTPUT_FILENAME}{next_number:02d}.csv")
 
-    with open(output_file, "w") as file:
-        for term, score in sorted_terms[:num_top_terms]:
-            file.write(f"{term}: {score}\n")
+    with open(output_file, "w", newline="") as csvfile:
+        fieldnames = [
+            "Term",
+            "TF-IDF Normalized",
+            "TF-IDF",
+            "average verboseness of documents with term",
+            "burstiness values",
+        ]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        for term, values in scored_terms.items():
+            writer.writerow(
+                {
+                    "Term": term,
+                    "TF-IDF Normalized": values["adjusted_score"],
+                    "TF-IDF": values["TF-IDF"],
+                    "average verboseness of documents with term": values[
+                        "mean_verbose_with_term"
+                    ],
+                    "burstiness values": values["bursty_values"],
+                }
+            )
 
 
 def main():
@@ -217,11 +223,11 @@ def main():
     print(f"Cálculo TF-IDF concluído. Tempo decorrido: {tfidf_duration}")
 
     start_display_time = datetime.datetime.now()
-    print("Exibindo os termos mais relevantes...")
-    display_top_terms(scored_terms, num_top_terms=NUM_TOP_TERMS)
+    print("Salvando os termos mais relevantes em um arquivo CSV...")
+    write_top_terms(scored_terms)
     end_display_time = datetime.datetime.now()
     display_duration = end_display_time - start_display_time
-    print(f"Exibição concluída. Tempo decorrido: {display_duration}")
+    print(f"Salvamento concluído. Tempo decorrido: {display_duration}")
 
     end_time = datetime.datetime.now()
     total_duration = end_time - start_time
