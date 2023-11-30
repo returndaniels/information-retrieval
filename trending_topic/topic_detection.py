@@ -4,11 +4,10 @@ import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
-from utils import log, log_step, get_stopwords, preprocess_documents
+from utils import log, log_step, get_stopwords, preprocess_documents, write_output
 from dotenv import load_dotenv
 
 import datetime
-import csv
 import os
 
 load_dotenv()
@@ -149,46 +148,6 @@ def calculate_tfidf(processed_data: pd.DataFrame):
     return {term: values for term, values in sorted_normalized_tfidf}
 
 
-def write_top_terms(scored_terms: dict, output_dir: str = OUTPUT_DIR):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    existing_files = [
-        filename
-        for filename in os.listdir(output_dir)
-        if filename.startswith(OUTPUT_FILENAME)
-    ]
-    last_number = max(
-        [int(file.split("_")[-1].split(".")[0]) for file in existing_files], default=0
-    )
-    next_number = last_number + 1
-    output_file = os.path.join(output_dir, f"{OUTPUT_FILENAME}{next_number:02d}.csv")
-
-    with open(output_file, "w", newline="") as csvfile:
-        fieldnames = [
-            "Term",
-            "TF-IDF Normalized",
-            "TF-IDF",
-            "average verboseness of documents with term",
-            "burstiness values",
-        ]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-        writer.writeheader()
-        for term, values in scored_terms.items():
-            writer.writerow(
-                {
-                    "Term": term,
-                    "TF-IDF Normalized": values["adjusted_score"],
-                    "TF-IDF": values["TF-IDF"],
-                    "average verboseness of documents with term": values[
-                        "mean_verbose_with_term"
-                    ],
-                    "burstiness values": values["bursty_values"],
-                }
-            )
-
-
 def main():
     """
     Função principal para executar todo o fluxo de trabalho.
@@ -208,7 +167,24 @@ def main():
     scored_terms = log_step(
         global_start_time, LOG_MSG_CALC_TFIDF, calculate_tfidf, processed_data
     )
-    log_step(global_start_time, LOG_MSG_WRITE_TERMS, write_top_terms, scored_terms)
+
+    fieldnames = [
+        "term",
+        "adjusted_score",
+        "TF-IDF",
+        "mean_verbose_with_term",
+        "bursty_values",
+    ]
+
+    log_step(
+        global_start_time,
+        LOG_MSG_WRITE_TERMS,
+        write_output,
+        scored_terms,
+        OUTPUT_DIR,
+        OUTPUT_FILENAME,
+        fieldnames,
+    )
 
 
 if __name__ == "__main__":
