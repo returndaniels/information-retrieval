@@ -3,8 +3,10 @@ from nltk.corpus import stopwords
 from nltk.tokenize.casual import TweetTokenizer
 import datetime
 
+from typing import Callable, Any, Tuple
 
-def log(start_time, msg):
+
+def log(start_time: datetime.datetime, msg: str):
     """
     Registra uma mensagem de log com o tempo decorrido desde o início do programa.
 
@@ -17,7 +19,13 @@ def log(start_time, msg):
     print(f"[\033[91m{duration}\033[0m] {msg}")
 
 
-def log_step(start_time, step_message, func, *args, **kwargs):
+def log_step(
+    start_time: datetime.datetime,
+    step_message: str,
+    func: Callable[..., Any],
+    *args: Tuple[Any],
+    **kwargs: Any,
+):
     """
     Registra uma mensagem de log para o início e o término de uma etapa do processo.
 
@@ -36,7 +44,7 @@ def log_step(start_time, step_message, func, *args, **kwargs):
     return result
 
 
-def get_stopwords(stopwords_path, lang):
+def get_stopwords(stopwords_path: str, lang: str):
     """
     Obtém as stopwords para um idioma específico a partir de um arquivo.
 
