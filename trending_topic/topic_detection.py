@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 import pandas as pd
 import numpy as np
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
-from nltk.corpus import stopwords
-from nltk.tokenize.casual import TweetTokenizer
-
+from utils import log, log_step, get_stopwords, preprocess_documents
 from dotenv import load_dotenv
+
 import datetime
 import csv
 import os
@@ -23,29 +23,17 @@ CSV_DELIMITER = os.getenv("CSV_DELIMITER")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR")
 OUTPUT_FILENAME = os.getenv("OUTPUT_FILENAME")
 
+LOG_MSG_START = "Iniciando o processo..."
+LOG_MSG_PREPROCESS = "pré-processamento dos documentos"
+LOG_MSG_VERBOSENESS = "o cálculo a Verboseness para os termos"
+LOG_MSG_BURSTINESS = "o cálculo a Burstiness para os documentos"
+LOG_MSG_CALC_TFIDF = "o cálculo dos scores TF-IDF"
+LOG_MSG_SCORE_START = "Calculando os scores normalizados..."
+LOG_MSG_SCORE_COMPLETE = "Cálculo dos scores normalizados concluído"
+LOG_MSG_WRITE_TERMS = "o salvamento dos termos mais relevantes em um arquivo CSV"
+LOG_MSG_COMPLETE = "Processo completo. Tempo total decorrido:"
 
-def get_stopwords():
-    df = pd.read_fwf(PATH_STOPWORDS, header=None)
-    custom_stopwords = df.values.tolist()
-    custom_stopwords = [s[0] for s in custom_stopwords]
-    stop_words = set(stopwords.words(DATA_LANG))
-    stop_words.update(custom_stopwords)
-    return stop_words
-
-
-def preprocess_documents(data: pd.DataFrame):
-    """
-    Realiza o pré-processamento dos documentos removendo pontuações, stopwords e palavras com apenas uma letra.
-
-    Args:
-    - data (pd.DataFrame): Lista de strings representando os documentos.
-
-    Returns:
-    - list: Lista de strings contendo os documentos pré-processados.
-    """
-    tokenizer = TweetTokenizer()
-    data = data.apply(lambda x: " ".join(tokenizer.tokenize(x.lower())))
-    return data
+global_start_time = None
 
 
 def calculate_verboseness(processed_data: pd.DataFrame):
@@ -109,7 +97,7 @@ def calculate_tfidf(processed_data: pd.DataFrame):
     tfidf_matrix = tfidf_vectorizer.fit_transform(processed_data)
     terms = tfidf_vectorizer.get_feature_names_out()
 
-    stop_words = get_stopwords()
+    stop_words = get_stopwords(PATH_STOPWORDS, DATA_LANG)
     term_df = pd.DataFrame({"term": terms})
     term_df["last_word"] = term_df["term"].str.split().str[-1]
     filtered_terms = term_df[
@@ -119,13 +107,20 @@ def calculate_tfidf(processed_data: pd.DataFrame):
 
     count_matrix = count_vectorizer.fit_transform(processed_data)
 
-    verbose_values = calculate_verboseness(processed_data)
-    bursty_values = calculate_burstiness(count_matrix, filtered_terms)
+    verbose_values = log_step(
+        global_start_time, LOG_MSG_VERBOSENESS, calculate_verboseness, processed_data
+    )
+    bursty_values = log_step(
+        global_start_time,
+        LOG_MSG_BURSTINESS,
+        calculate_burstiness,
+        count_matrix,
+        filtered_terms,
+    )
 
     term_scores = {}
 
-    start_score_time = datetime.datetime.now()
-    print("Calculando os scores normalizados...")
+    log(global_start_time, LOG_MSG_SCORE_START)
 
     tfidf_array = tfidf_matrix.toarray()
     for i, term in enumerate(filtered_terms):
@@ -146,9 +141,8 @@ def calculate_tfidf(processed_data: pd.DataFrame):
             "mean_verbose_with_term": mean_verbose_with_term,
             "bursty_values": bursty_values[term],
         }
-    end_score_time = datetime.datetime.now()
-    score_duration = end_score_time - start_score_time
-    print(f"Cálculo scores normalizados concluído. Tempo decorrido: {score_duration}")
+    log(global_start_time, LOG_MSG_SCORE_COMPLETE)
+
     sorted_normalized_tfidf = sorted(
         term_scores.items(), key=lambda x: x[1]["adjusted_score"], reverse=True
     )
@@ -199,8 +193,7 @@ def main():
     """
     Função principal para executar todo o fluxo de trabalho.
     """
-    start_time = datetime.datetime.now()
-    print("Iniciando o processo...")
+    log(global_start_time, LOG_MSG_START)
 
     # Carregando uma coleção de documentos de exemplo
     data_path = PATH_DATASET
@@ -209,31 +202,15 @@ def main():
         data_col
     ]
 
-    start_preprocess_time = datetime.datetime.now()
-    print("Iniciando o pré-processamento dos documentos...")
-    processed_data = preprocess_documents(data)
-    end_preprocess_time = datetime.datetime.now()
-    preprocess_duration = end_preprocess_time - start_preprocess_time
-    print(f"Pré-processamento concluído. Tempo decorrido: {preprocess_duration}")
-
-    start_tfidf_time = datetime.datetime.now()
-    print("Calculando os scores TF-IDF...")
-    scored_terms = calculate_tfidf(processed_data=processed_data)
-    end_tfidf_time = datetime.datetime.now()
-    tfidf_duration = end_tfidf_time - start_tfidf_time
-    print(f"Cálculo TF-IDF concluído. Tempo decorrido: {tfidf_duration}")
-
-    start_display_time = datetime.datetime.now()
-    print("Salvando os termos mais relevantes em um arquivo CSV...")
-    write_top_terms(scored_terms)
-    end_display_time = datetime.datetime.now()
-    display_duration = end_display_time - start_display_time
-    print(f"Salvamento concluído. Tempo decorrido: {display_duration}")
-
-    end_time = datetime.datetime.now()
-    total_duration = end_time - start_time
-    print(f"Processo completo. Tempo total decorrido: {total_duration}")
+    processed_data = log_step(
+        global_start_time, LOG_MSG_PREPROCESS, preprocess_documents, data
+    )
+    scored_terms = log_step(
+        global_start_time, LOG_MSG_CALC_TFIDF, calculate_tfidf, processed_data
+    )
+    log_step(global_start_time, LOG_MSG_WRITE_TERMS, write_top_terms, scored_terms)
 
 
 if __name__ == "__main__":
+    global_start_time = datetime.datetime.now()
     main()
