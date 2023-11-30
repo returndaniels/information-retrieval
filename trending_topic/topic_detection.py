@@ -33,36 +33,27 @@ def get_stopwords():
     return stop_words
 
 
-def preprocess_documents(data: list):
+def preprocess_documents(data: pd.DataFrame):
     """
     Realiza o pré-processamento dos documentos removendo pontuações, stopwords e palavras com apenas uma letra.
 
     Args:
-    - data (list): Lista de strings representando os documentos.
+    - data (pd.DataFrame): Lista de strings representando os documentos.
 
     Returns:
     - list: Lista de strings contendo os documentos pré-processados.
     """
     tokenizer = TweetTokenizer()
-
-    processed_data = []
-    for doc in data:
-        # tokens = word_tokenize(doc)  # Tokenizar as palavras
-        tokens = tokenizer.tokenize(doc.lower())  # Tokenizar as tweets
-
-        # Reunir as palavras processadas em uma string
-        processed_doc = " ".join(tokens)
-        processed_data.append(processed_doc)
-
-    return processed_data
+    data = data.apply(lambda x: " ".join(tokenizer.tokenize(x.lower())))
+    return data
 
 
-def calculate_verboseness(processed_data: list):
+def calculate_verboseness(processed_data: pd.DataFrame):
     """
     Calcula a Verboseness dos documentos pré-processados.
 
     Args:
-    - processed_data (list): Lista de strings representando os documentos pré-processados.
+    - processed_data (pd.DataFrame): Lista de strings representando os documentos pré-processados.
 
     Returns:
     - ict: Dicionário contendo os valores de Verboseness por documento.
@@ -92,22 +83,22 @@ def calculate_burstiness(terms_matrix, terms):
     Returns:
     - dict: Dicionário contendo os valores de Burstiness por termo.
     """
-    dense_matrix = terms_matrix.toarray()
-    docs_with_term = np.sum(dense_matrix > 0, axis=0)
-    term_counts = np.sum(dense_matrix, axis=0)
-    bursty_values = None
-    with np.errstate(divide="ignore", invalid="ignore"):
-        bursty_values = np.where(docs_with_term != 0, term_counts / docs_with_term, 0.0)
 
+    with np.errstate(divide="ignore", invalid="ignore"):
+        term_counts = np.asarray(terms_matrix.sum(axis=0)).flatten()
+        docs_with_terms = np.asarray(terms_matrix.astype(bool).sum(axis=0)).flatten()
+        bursty_values = np.where(
+            docs_with_terms != 0, term_counts / docs_with_terms, 0.0
+        )
     return dict(zip(terms, bursty_values))
 
 
-def calculate_tfidf(processed_data):
+def calculate_tfidf(processed_data: pd.DataFrame):
     """
     Calcula os scores TF-IDF normalizados por Verboseness e Burstiness dos termos nos documentos pré-processados.
 
     Args:
-    - processed_data (list): Lista de strings representando os documentos pré-processados.
+    - processed_data (pd.DataFrame): Lista de strings representando os documentos pré-processados.
 
     Returns:
     - dict: Dicionário contendo os termos e seus scores TF-IDF normalizados por Verboseness e Burstiness, ordenados por relevância.
@@ -119,9 +110,12 @@ def calculate_tfidf(processed_data):
     terms = tfidf_vectorizer.get_feature_names_out()
 
     stop_words = get_stopwords()
-    filtered_terms = [
-        term for term in terms if term.split()[-1] not in stop_words and len(term) > 3
-    ]
+    term_df = pd.DataFrame({"term": terms})
+    term_df["last_word"] = term_df["term"].str.split().str[-1]
+    filtered_terms = term_df[
+        (term_df["last_word"].isin(stop_words) == False)
+        & (term_df["term"].str.len() > 3)
+    ]["term"].tolist()
 
     count_matrix = count_vectorizer.fit_transform(processed_data)
 
@@ -129,10 +123,15 @@ def calculate_tfidf(processed_data):
     bursty_values = calculate_burstiness(count_matrix, filtered_terms)
 
     term_scores = {}
+
+    start_score_time = datetime.datetime.now()
+    print("Calculando os scores normalizados...")
+
+    tfidf_array = tfidf_matrix.toarray()
     for i, term in enumerate(filtered_terms):
-        term_occurrences = tfidf_matrix[:, i]
         term_index = tfidf_vectorizer.vocabulary_.get(term)
-        term_tf_idf = tfidf_matrix[:, term_index].toarray().sum()
+        term_tf_idf = tfidf_array[:, term_index].sum()
+        term_occurrences = tfidf_array[:, i]
         doc_indices_with_term = term_occurrences.nonzero()[0]
         mean_verbose_with_term = (
             np.mean([verbose_values[d] for d in doc_indices_with_term])
@@ -147,7 +146,9 @@ def calculate_tfidf(processed_data):
             "mean_verbose_with_term": mean_verbose_with_term,
             "bursty_values": bursty_values[term],
         }
-
+    end_score_time = datetime.datetime.now()
+    score_duration = end_score_time - start_score_time
+    print(f"Cálculo scores normalizados concluído. Tempo decorrido: {score_duration}")
     sorted_normalized_tfidf = sorted(
         term_scores.items(), key=lambda x: x[1]["adjusted_score"], reverse=True
     )
@@ -206,7 +207,7 @@ def main():
     data_col = CONTENT_COL
     data = pd.read_csv(data_path, delimiter=CSV_DELIMITER, nrows=MAX_DOCS_PREPROCESS)[
         data_col
-    ].values
+    ]
 
     start_preprocess_time = datetime.datetime.now()
     print("Iniciando o pré-processamento dos documentos...")
