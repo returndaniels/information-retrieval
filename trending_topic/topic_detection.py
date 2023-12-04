@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 import pandas as pd
 import numpy as np
+import concurrent.futures
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import TruncatedSVD
 from utils import log, log_step, get_stopwords, preprocess_documents, write_output
 from dotenv import load_dotenv
 
@@ -80,6 +82,60 @@ def calculate_burstiness(terms_matrix, terms):
     return dict(zip(terms, bursty_values))
 
 
+def calculate_score_for_term(
+    i,
+    term,
+    term_index,
+    tfidf_matrix,
+    verbose_values,
+    bursty_values,
+):
+    term_tf_idf = tfidf_matrix[:, term_index].sum()
+    term_occurrences = tfidf_matrix[:, i]
+    doc_indices_with_term = term_occurrences.nonzero()[0]
+    mean_verbose_with_term = (
+        np.mean([verbose_values[d] for d in doc_indices_with_term])
+        if len(doc_indices_with_term) > 0
+        else 0.0
+    )
+
+    adjusted_score = term_tf_idf / (mean_verbose_with_term * bursty_values[term])
+
+    return {
+        "adjusted_score": adjusted_score,
+        "TF-IDF": term_tf_idf,
+        "mean_verbose_with_term": mean_verbose_with_term,
+        "bursty_values": bursty_values[term],
+    }
+
+
+def process_terms(
+    start,
+    end,
+    filtered_terms,
+    tfidf_vectorizer,
+    tfidf_matrix,
+    verbose_values,
+    bursty_values,
+):
+    partial_scores = {}
+    try:
+        for i in range(start, end):
+            term = filtered_terms[i]
+            term_index = tfidf_vectorizer.vocabulary_.get(term)
+            partial_scores[term] = calculate_score_for_term(
+                i,
+                term,
+                term_index,
+                tfidf_matrix,
+                verbose_values,
+                bursty_values,
+            )
+    except Exception as e:
+        print(f"Erro durante o processamento: {e}")
+    return partial_scores
+
+
 def calculate_tfidf(processed_data: pd.DataFrame):
     """
     Calcula os scores TF-IDF normalizados por Verboseness e Burstiness dos termos nos documentos pré-processados.
@@ -117,29 +173,37 @@ def calculate_tfidf(processed_data: pd.DataFrame):
         filtered_terms,
     )
 
+    num_terms = len(filtered_terms)
+    chunk_size = 250
+    start_indices = list(range(0, num_terms, chunk_size))
+    end_indices = start_indices[1:] + [num_terms]
+
     term_scores = {}
 
     log(global_start_time, LOG_MSG_SCORE_START)
 
-    tfidf_array = tfidf_matrix.toarray()
-    for i, term in enumerate(filtered_terms):
-        term_index = tfidf_vectorizer.vocabulary_.get(term)
-        term_tf_idf = tfidf_array[:, term_index].sum()
-        term_occurrences = tfidf_array[:, i]
-        doc_indices_with_term = term_occurrences.nonzero()[0]
-        mean_verbose_with_term = (
-            np.mean([verbose_values[d] for d in doc_indices_with_term])
-            if len(doc_indices_with_term) > 0
-            else 0.0
-        )
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = []
+        for start, end in zip(start_indices, end_indices):
+            future = executor.submit(
+                process_terms,
+                start,
+                end,
+                filtered_terms,
+                tfidf_vectorizer,
+                tfidf_matrix,
+                verbose_values,
+                bursty_values,
+            )
+            futures.append(future)
 
-        adjusted_score = term_tf_idf / (mean_verbose_with_term * bursty_values[term])
-        term_scores[term] = {
-            "adjusted_score": adjusted_score,
-            "TF-IDF": term_tf_idf,
-            "mean_verbose_with_term": mean_verbose_with_term,
-            "bursty_values": bursty_values[term],
-        }
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                partial_scores = future.result()
+                term_scores.update(partial_scores)
+            except Exception as e:
+                print(f"Erro ao obter resultado do futuro: {e}")
+
     log(global_start_time, LOG_MSG_SCORE_COMPLETE)
 
     sorted_normalized_tfidf = sorted(
