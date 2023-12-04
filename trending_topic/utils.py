@@ -66,8 +66,7 @@ def log_step(
         return result
     except Exception as e:
         log_error(start_time, step_message, e)
-        log(start_time, "Encerrando programa.")
-        exit(1)
+        raise
 
 
 def get_stopwords(stopwords_path: str, lang: str):
