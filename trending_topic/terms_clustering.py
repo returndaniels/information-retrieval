@@ -1,14 +1,10 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict
+import pandas as pd
 
 # Leitura do arquivo e armazenamento dos termos e suas pontuações TF-IDF
-file_content = []
-
-with open("output/train50_top100_ng4_docs500_01.txt", "r", encoding="utf-8") as file:
-    for line in file:
-        term, tfidf_score = line.split(":")
-        file_content.append(term.strip())
+file_content = pd.read_csv("output/gta_forfun_01.csv", delimiter=",")["term"].values
 
 # Criando um vetor TF-IDF
 vectorizer = TfidfVectorizer()

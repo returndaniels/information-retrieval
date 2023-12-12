@@ -128,7 +128,7 @@ def write_output(
         [int(file.split("_")[-1].split(".")[0]) for file in existing_files], default=0
     )
     next_number = last_number + 1
-    output_file = os.path.join(output_dir, f"{output_filename}{next_number:02d}.csv")
+    output_file = os.path.join(output_dir, f"{output_filename}_{next_number:02d}.csv")
 
     with open(output_file, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
